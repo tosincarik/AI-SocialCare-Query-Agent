@@ -67,10 +67,15 @@ This automatically makes the function available to the agent, with metadata (nam
 
 User Input → Natural language question.
 Agent → Interprets input, plans next step.
+
 Runner → Passes control to the correct tool (if needed).
+
 Tool → Executes SQL, retrieves data.
+
 Tracer → Logs the whole interaction.
+
 Agent → Crafts final natural-language answer.
+
 User Output → Clean results (tables, summaries, etc.).
 
 
@@ -78,9 +83,13 @@ User Output → Clean results (tables, summaries, etc.).
 ## Tech Stack
 
 Python
+
 SQLite (for database)
+
 OpenAI SDK (for AI query translation & structured outputs)
+
 OpenAI Tracing Tools (AgentTracer, Runner for monitoring and execution)
+
 dotenv (for managing API keys securely)
 
 
@@ -90,9 +99,13 @@ dotenv (for managing API keys securely)
 
 The synthetic database contains 4 core tables:
 clients – demographics & postcode
+
 assessments – assessment history (type, assessor, date)
+
 services – allocated care services with provider info
+
 outcomes – service outcomes (Independence, Safety, etc.)
+
 Each table links via client_id for relational queries.
 
 
