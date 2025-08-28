@@ -115,6 +115,25 @@ gender	total_clients
 Male	26
 Female	24
 
+
+
+
+### Usage
+
+Type a natural language query (e.g., "Show me the average age of clients with pending referrals")
+
+Agent translates query → SQL → Executes → Returns structured output
+
+Use Agent Tracer to monitor steps, debug, and view logs
+
+Example Queries
+
+"List the top 5 clients by number of assessments"
+
+"What is the average time between referral and assessment?"
+
+"Show a summary of services provided by category"
+
 📜 License
 
 MIT License – feel free to use, modify, and share.
