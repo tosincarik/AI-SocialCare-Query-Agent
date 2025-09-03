@@ -7,6 +7,10 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 tzdata==2025.2
 
+certifi>=2024.12.14
+
+
+
 # Visualization
 altair==5.5.0
 pydeck==0.9.1
