@@ -6,14 +6,8 @@ numpy==2.3.2
 python-dateutil==2.9.0.post0
 pytz==2025.2
 tzdata==2025.2
-<<<<<<< HEAD
-
-certifi>=2024.12.14
-=======
 python-dotenv==1.0.1
 openai==1.47.0
-agents==<latest-compatible-version>  # check if there’s a TF-free version
->>>>>>> afb32e975fb357b7d0b9a0d0c620db23f5ee096d
 
 # Visualization
 altair==5.5.0
@@ -26,8 +20,4 @@ requests==2.32.5
 attrs==25.3.0
 blinker==1.9.0
 cachetools==6.2.0
-<<<<<<< HEAD
-certifi==2025.8
-=======
 certifi>=2024.12.14,<2026.0
->>>>>>> afb32e975fb357b7d0b9a0d0c620db23f5ee096d
