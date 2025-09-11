@@ -1,3 +1,4 @@
+
 # agents/runner.py
 from openai import OpenAI
 
@@ -14,6 +15,8 @@ class Runner:
                 {"role": "user", "content": prompt}
             ]
         )
-        return type("Result", (), {
-            "final_output": response.choices[0].message["content"]
-        })
+        class Result:
+            def __init__(self, final_output):
+                self.final_output = final_output
+
+        return Result(response.choices[0].message["content"])
