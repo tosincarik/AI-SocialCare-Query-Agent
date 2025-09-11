@@ -8,6 +8,7 @@ pytz==2025.2
 tzdata==2025.2
 python-dotenv==1.0.1
 openai==1.47.0
+agents
 
 
 
