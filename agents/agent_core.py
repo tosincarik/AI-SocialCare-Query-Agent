@@ -1,12 +1,23 @@
+from openai import OpenAI
+
+client = OpenAI()
+
 class Agent:
-    def __init__(self, name, instructions, model=None, tools=None):
+    def __init__(self, name, instructions, model="gpt-4o-mini", tools=None):
         self.name = name
         self.instructions = instructions
         self.model = model
         self.tools = tools or []
 
     def as_tool(self, tool_name, tool_description):
-        """Return a callable stub tool wrapper"""
-        def tool_fn(input_text):
-            return {"sql": "SELECT 1", "explanation": "Stub response (replace with real agent logic)"}
+        """Return a callable tool that wraps this agent."""
+        def tool_fn(prompt):
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.instructions},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message["content"]
         return tool_fn
