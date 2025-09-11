@@ -111,6 +111,11 @@ schema = {
 # ### AI SQL Agent Setup
 from dotenv import load_dotenv
 from openai import OpenAI
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
 from agents import Agent, Runner, trace, function_tool
 
 load_dotenv(override=True)
