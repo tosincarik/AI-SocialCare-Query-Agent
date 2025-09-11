@@ -1,3 +1,4 @@
+# apps/SocialCareQuery.py
 # %%
 import sqlite3
 import os
@@ -6,6 +7,7 @@ import random
 import asyncio
 import streamlit as st
 import pandas as pd
+import json
 
 # Ensure the 'data' folder exists
 os.makedirs('data', exist_ok=True)
@@ -15,8 +17,7 @@ db_path = os.path.join('data', 'synthetic_socialcare2.db')
 
 # %% [markdown]
 # ### Database setup and synthetic data population
-
-# Connect and create tables if they don't exist
+# (keep the same DB setup/population logic you already had)
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
@@ -69,33 +70,36 @@ CREATE TABLE outcomes (
 """)
 conn.commit()
 
-# Populate synthetic data
+# Populate synthetic data (if empty)
 fake = Faker("en_GB")
-N_CLIENTS = 50
-for client_id in range(1, N_CLIENTS + 1):
-    name = fake.name()
-    age = random.randint(18, 95)
-    gender = random.choice(["Male", "Female"])
-    postcode = fake.postcode()
-    cursor.execute("INSERT INTO clients VALUES (?, ?, ?, ?, ?)", (client_id, name, age, gender, postcode))
+cursor.execute("SELECT COUNT(*) FROM clients")
+count_clients = cursor.fetchone()[0]
+if count_clients == 0:
+    N_CLIENTS = 50
+    for client_id in range(1, N_CLIENTS + 1):
+        name = fake.name()
+        age = random.randint(18, 95)
+        gender = random.choice(["Male", "Female"])
+        postcode = fake.postcode()
+        cursor.execute("INSERT INTO clients VALUES (?, ?, ?, ?, ?)", (client_id, name, age, gender, postcode))
 
-    for _ in range(random.randint(1,3)):
-        cursor.execute("INSERT INTO assessments (client_id, assessment_date, assessment_type, assessor) VALUES (?, ?, ?, ?)",
-                       (client_id, fake.date_between(start_date="-2y", end_date="today"),
-                        random.choice(["Care Act", "Financial", "Risk"]), fake.name()))
-    for _ in range(random.randint(1,2)):
-        start_date = fake.date_between(start_date="-2y", end_date="-1m")
-        end_date = fake.date_between(start_date=start_date, end_date="today")
-        cursor.execute("INSERT INTO services (client_id, service_name, start_date, end_date, provider) VALUES (?, ?, ?, ?, ?)",
-                       (client_id, random.choice(["Home Care", "Residential Care", "Day Centre", "Direct Payment"]),
-                        start_date, end_date, random.choice(["Local Authority", "Private Agency", "Charity"])))
-    for _ in range(random.randint(1,2)):
-        cursor.execute("INSERT INTO outcomes (client_id, outcome_date, outcome_type, outcome_value) VALUES (?, ?, ?, ?)",
-                       (client_id, fake.date_between(start_date="-1y", end_date="today"),
-                        random.choice(["Independence", "Wellbeing", "Safety", "Financial"]),
-                        random.choice(["Improved", "Maintained", "Declined"])))
+        for _ in range(random.randint(1,3)):
+            cursor.execute("INSERT INTO assessments (client_id, assessment_date, assessment_type, assessor) VALUES (?, ?, ?, ?)",
+                           (client_id, fake.date_between(start_date="-2y", end_date="today"),
+                            random.choice(["Care Act", "Financial", "Risk"]), fake.name()))
+        for _ in range(random.randint(1,2)):
+            start_date = fake.date_between(start_date="-2y", end_date="-1m")
+            end_date = fake.date_between(start_date=start_date, end_date="today")
+            cursor.execute("INSERT INTO services (client_id, service_name, start_date, end_date, provider) VALUES (?, ?, ?, ?, ?)",
+                           (client_id, random.choice(["Home Care", "Residential Care", "Day Centre", "Direct Payment"]),
+                            start_date, end_date, random.choice(["Local Authority", "Private Agency", "Charity"])))
+        for _ in range(random.randint(1,2)):
+            cursor.execute("INSERT INTO outcomes (client_id, outcome_date, outcome_type, outcome_value) VALUES (?, ?, ?, ?)",
+                           (client_id, fake.date_between(start_date="-1y", end_date="today"),
+                            random.choice(["Independence", "Wellbeing", "Safety", "Financial"]),
+                            random.choice(["Improved", "Maintained", "Declined"])))
+    conn.commit()
 
-conn.commit()
 conn.close()
 
 # %% [markdown]
@@ -112,16 +116,11 @@ schema = {
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# ensure agents package visible
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-
-
-from agents.agent_core import Agent
-from agents.runner import Runner
-from agents.trace import trace
-from agents.tools import function_tool
-
+from agents import Agent, Runner, trace, function_tool
 
 load_dotenv(override=True)
 openaikey = os.getenv("OPENAI_API_KEY")
@@ -135,12 +134,16 @@ else:
 @function_tool
 def execute_sql(query: str):
     """Run a read-only SQL query on the SQLite DB and return results as list of dicts."""
+    # enforce SELECT-only safety
+    if not query.strip().lower().startswith("select"):
+        raise ValueError("Only SELECT queries are allowed.")
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(query)
         rows = cursor.fetchall()
-        colnames = [desc[0] for desc in cursor.description]
-    return [dict(zip(colnames, row)) for row in rows]
+        colnames = rows[0].keys() if rows else []
+        return [dict(zip(colnames, row)) for row in rows]
 
 # %% [markdown]
 # #### Agent instructions
@@ -155,15 +158,18 @@ Schema reference: {schema}
 Make sure the output is a single valid JSON object, nothing else.
 """
 
+# agent that can be used as tool to generate SQL
 Agent1 = Agent(name='QueryExecutor', instructions=instruction1, model="gpt-4o-mini")
 tool1 = Agent1.as_tool(tool_name='instruct', tool_description=instruction1)
-tools = [tool1, execute_sql]
 
+# final agent that will run generator + db tool
+tools = [tool1, execute_sql]
 instruction2 = "You are to execute the SQL query you generate and return a clean formatted table. Use the tools provided to you"
 resultagent = Agent(name="strictinstruct", instructions=instruction2, tools=tools, model='gpt-4o-mini')
 
 # %% [markdown]
 # ### Streamlit App UI
+st.set_page_config(page_title="Social Care Query Agent", layout="wide")
 st.title("Social Care Query Agent")
 
 # Initialize conversation
@@ -196,14 +202,16 @@ if prompt := st.chat_input("Ask me about the social care database..."):
         loop.close()
 
         # Try to parse JSON for table display
-        import json
         table_data = None
         try:
             parsed = json.loads(output)
             sql_query = parsed.get("sql")
             explanation = parsed.get("explanation")
-            # Execute the query to get actual results
-            table_data = execute_sql(sql_query)
+            # Execute the query to get actual results if not already included
+            if parsed.get("rows") is None:
+                table_data = execute_sql(sql_query)
+            else:
+                table_data = parsed.get("rows")
             df = pd.DataFrame(table_data)
             placeholder.markdown(f"**Explanation:** {explanation}")
             if not df.empty:
@@ -211,9 +219,11 @@ if prompt := st.chat_input("Ask me about the social care database..."):
                 st.bar_chart(df.select_dtypes(include="number"))  # Chart numeric columns
                 csv = df.to_csv(index=False)
                 st.download_button("Download CSV", csv, "query_results.csv")
-        except Exception:
-            # Fallback if output is not JSON
-            placeholder.markdown(output)
+            else:
+                placeholder.markdown("Query returned no rows.")
+        except Exception as e:
+            # Fallback if output is not JSON or other errors
+            placeholder.markdown(f"Error parsing agent output: {e}\n\nRaw output:\n{output}")
 
-        # Save assistant response
+        # Save assistant response (raw output string)
         st.session_state.messages.append({"role": "assistant", "content": output})
