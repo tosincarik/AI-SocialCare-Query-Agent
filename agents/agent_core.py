@@ -1,7 +1,11 @@
+import os
+from dotenv import load_dotenv
 from openai import OpenAI
 import json
 
-client = OpenAI()
+load_dotenv(override=True)  # Ensure env variables are loaded
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # now it picks up the key
 
 class Agent:
     def __init__(self, name, instructions, model="gpt-4o-mini", tools=None):
