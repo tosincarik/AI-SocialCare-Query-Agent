@@ -1,5 +1,4 @@
-# apps/SocialCareQuery.py
-# %%
+# %% 
 import sqlite3
 import os
 from faker import Faker
@@ -7,76 +6,39 @@ import random
 import asyncio
 import streamlit as st
 import pandas as pd
+from dotenv import load_dotenv
+import sys
 import json
 
-# Ensure the 'data' folder exists
-os.makedirs('data', exist_ok=True)
+# Add parent directory to path to import agents package
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Define the database path
+from agents import Agent, Runner, trace, function_tool
+
+# Ensure 'data' folder exists
+os.makedirs('data', exist_ok=True)
 db_path = os.path.join('data', 'synthetic_socialcare2.db')
 
-# %% [markdown]
-# ### Database setup and synthetic data population
-# (keep the same DB setup/population logic you already had)
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
+# Load OpenAI API key
+load_dotenv(override=True)
+openaikey = os.getenv("OPENAI_API_KEY")
+if not openaikey:
+    st.error("OpenAI API key not found. Please set OPENAI_API_KEY in your .env file.")
 
-# Drop old tables (for testing/re-runs)
-cursor.execute("DROP TABLE IF EXISTS clients")
-cursor.execute("DROP TABLE IF EXISTS assessments")
-cursor.execute("DROP TABLE IF EXISTS services")
-cursor.execute("DROP TABLE IF EXISTS outcomes")
+# %% Database setup and synthetic data (skip if already exists)
+if not os.path.exists(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-# Create tables
-cursor.execute("""
-CREATE TABLE clients (
-    client_id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    age INTEGER,
-    gender TEXT,
-    postcode TEXT
-)
-""")
-cursor.execute("""
-CREATE TABLE assessments (
-    assessment_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER,
-    assessment_date TEXT,
-    assessment_type TEXT,
-    assessor TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients(client_id)
-)
-""")
-cursor.execute("""
-CREATE TABLE services (
-    service_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER,
-    service_name TEXT,
-    start_date TEXT,
-    end_date TEXT,
-    provider TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients(client_id)
-)
-""")
-cursor.execute("""
-CREATE TABLE outcomes (
-    outcome_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER,
-    outcome_date TEXT,
-    outcome_type TEXT,
-    outcome_value TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients(client_id)
-)
-""")
-conn.commit()
+    # Create tables
+    cursor.execute("""CREATE TABLE clients (client_id INTEGER PRIMARY KEY, name TEXT, age INTEGER, gender TEXT, postcode TEXT)""")
+    cursor.execute("""CREATE TABLE assessments (assessment_id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER, assessment_date TEXT, assessment_type TEXT, assessor TEXT, FOREIGN KEY (client_id) REFERENCES clients(client_id))""")
+    cursor.execute("""CREATE TABLE services (service_id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER, service_name TEXT, start_date TEXT, end_date TEXT, provider TEXT, FOREIGN KEY (client_id) REFERENCES clients(client_id))""")
+    cursor.execute("""CREATE TABLE outcomes (outcome_id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER, outcome_date TEXT, outcome_type TEXT, outcome_value TEXT, FOREIGN KEY (client_id) REFERENCES clients(client_id))""")
 
-# Populate synthetic data (if empty)
-fake = Faker("en_GB")
-cursor.execute("SELECT COUNT(*) FROM clients")
-count_clients = cursor.fetchone()[0]
-if count_clients == 0:
-    N_CLIENTS = 50
-    for client_id in range(1, N_CLIENTS + 1):
+    # Populate synthetic data
+    fake = Faker("en_GB")
+    for client_id in range(1, 51):
         name = fake.name()
         age = random.randint(18, 95)
         gender = random.choice(["Male", "Female"])
@@ -99,11 +61,9 @@ if count_clients == 0:
                             random.choice(["Independence", "Wellbeing", "Safety", "Financial"]),
                             random.choice(["Improved", "Maintained", "Declined"])))
     conn.commit()
+    conn.close()
 
-conn.close()
-
-# %% [markdown]
-# ### Schema dictionary for agent reference
+# %% Schema reference
 schema = {
     "clients": ["client_id", "name", "age", "gender", "postcode"],
     "assessments": ["assessment_id", "client_id", "assessment_date", "assessment_type", "assessor"],
@@ -111,42 +71,17 @@ schema = {
     "outcomes": ["outcome_id", "client_id", "outcome_date", "outcome_type", "outcome_value"]
 }
 
-# %% [markdown]
-# ### AI SQL Agent Setup
-from dotenv import load_dotenv
-from openai import OpenAI
-
-# ensure agents package visible
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from agents import Agent, Runner, trace, function_tool
-
-load_dotenv(override=True)
-openaikey = os.getenv("OPENAI_API_KEY")
-if openaikey:
-    print(f"OpenAI API key found: {openaikey[:8]}")
-else:
-    print("OpenAI API key not found")
-
-# %% [markdown]
-# #### SQL execution tool
+# %% SQL execution tool
 @function_tool
 def execute_sql(query: str):
-    """Run a read-only SQL query on the SQLite DB and return results as list of dicts."""
-    # enforce SELECT-only safety
-    if not query.strip().lower().startswith("select"):
-        raise ValueError("Only SELECT queries are allowed.")
     with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(query)
         rows = cursor.fetchall()
-        colnames = rows[0].keys() if rows else []
-        return [dict(zip(colnames, row)) for row in rows]
+        colnames = [desc[0] for desc in cursor.description]
+    return [dict(zip(colnames, row)) for row in rows]
 
-# %% [markdown]
-# #### Agent instructions
+# %% Agent setup
 instruction1 = f"""
 You are a SQL assistant for adult social care data.
 Always generate SELECT-only SQL for the SQLite schema provided.
@@ -158,25 +93,21 @@ Schema reference: {schema}
 Make sure the output is a single valid JSON object, nothing else.
 """
 
-# agent that can be used as tool to generate SQL
 Agent1 = Agent(name='QueryExecutor', instructions=instruction1, model="gpt-4o-mini")
 tool1 = Agent1.as_tool(tool_name='instruct', tool_description=instruction1)
-
-# final agent that will run generator + db tool
 tools = [tool1, execute_sql]
-instruction2 = "You are to execute the SQL query you generate and return a clean formatted table. Use the tools provided to you"
+
+instruction2 = "You are to execute the SQL query you generate and return a clean formatted table. Use the tools provided to you."
 resultagent = Agent(name="strictinstruct", instructions=instruction2, tools=tools, model='gpt-4o-mini')
 
-# %% [markdown]
-# ### Streamlit App UI
-st.set_page_config(page_title="Social Care Query Agent", layout="wide")
+# %% Streamlit UI
 st.title("Social Care Query Agent")
 
-# Initialize conversation
+# Session messages
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state.messages = []
 
-# Display past messages
+# Display previous messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -201,29 +132,19 @@ if prompt := st.chat_input("Ask me about the social care database..."):
         output = loop.run_until_complete(run_agent())
         loop.close()
 
-        # Try to parse JSON for table display
-        table_data = None
+        # Try to parse JSON
         try:
             parsed = json.loads(output)
             sql_query = parsed.get("sql")
             explanation = parsed.get("explanation")
-            # Execute the query to get actual results if not already included
-            if parsed.get("rows") is None:
-                table_data = execute_sql(sql_query)
-            else:
-                table_data = parsed.get("rows")
+            table_data = execute_sql(sql_query)
             df = pd.DataFrame(table_data)
             placeholder.markdown(f"**Explanation:** {explanation}")
             if not df.empty:
-                st.dataframe(df)  # Display as table
-                st.bar_chart(df.select_dtypes(include="number"))  # Chart numeric columns
-                csv = df.to_csv(index=False)
-                st.download_button("Download CSV", csv, "query_results.csv")
-            else:
-                placeholder.markdown("Query returned no rows.")
-        except Exception as e:
-            # Fallback if output is not JSON or other errors
-            placeholder.markdown(f"Error parsing agent output: {e}\n\nRaw output:\n{output}")
+                st.dataframe(df)
+                st.bar_chart(df.select_dtypes(include="number"))
+                st.download_button("Download CSV", df.to_csv(index=False), "query_results.csv")
+        except Exception:
+            placeholder.markdown(f"Error parsing agent output: {output}")
 
-        # Save assistant response (raw output string)
-        st.session_state.messages.append({"role": "assistant", "content": output})
+        st.session

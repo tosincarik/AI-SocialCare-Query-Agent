@@ -1,10 +1,7 @@
-# agents/agent_core.py
-import os
-import json
 from openai import OpenAI
+import json
 
-# Initialize OpenAI client with explicit API key
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI()
 
 class Agent:
     def __init__(self, name, instructions, model="gpt-4o-mini", tools=None):
@@ -13,31 +10,20 @@ class Agent:
         self.model = model
         self.tools = tools or []
 
-    def as_tool(self, tool_name: str, tool_description: str):
-        """
-        Return a callable tool that wraps this agent.
-        The tool sends the prompt to OpenAI and returns structured JSON.
-        """
-        def tool_fn(prompt: str):
+    def as_tool(self, tool_name, tool_description):
+        """Return a callable tool that wraps this agent with a real OpenAI call."""
+        def tool_fn(prompt):
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.instructions},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            content = response.choices[0].message["content"]
+            # Try to parse JSON, fallback to a simple explanation if it fails
             try:
-                response = client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": self.instructions},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                content = response.choices[0].message["content"]
-                print(f"[DEBUG] OpenAI response: {content}")  # Debug output
-                # Try parsing JSON
-                try:
-                    parsed = json.loads(content)
-                    return parsed
-                except json.JSONDecodeError:
-                    # Fallback: return explanation as content
-                    return {"sql": "", "explanation": content}
-            except Exception as e:
-                # Fallback for any API errors
-                print(f"[ERROR] Agent tool failed: {e}")
-                return {"sql": "", "explanation": f"Agent error: {e}"}
+                return json.loads(content)
+            except Exception:
+                return {"sql": "SELECT 1", "explanation": content}
         return tool_fn
