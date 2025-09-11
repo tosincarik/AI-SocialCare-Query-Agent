@@ -116,7 +116,12 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
-from agents.agent_core import Agent, Runner, trace, function_tool
+
+from agents.agent_core import Agent
+from agents.runner import Runner
+from agents.trace import trace
+from agents.tools import function_tool
+
 
 load_dotenv(override=True)
 openaikey = os.getenv("OPENAI_API_KEY")
