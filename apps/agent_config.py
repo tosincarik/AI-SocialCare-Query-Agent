@@ -2,7 +2,9 @@ import sqlite3, os
 from dotenv import load_dotenv
 from agents import Agent, Runner, trace, function_tool
 
-db_path = os.path.join("data", "synthetic_socialcare2.db")
+
+base_dir = os.path.dirname(__file__)  # the folder where app.py lives
+db_path = os.path.join(base_dir, "synthetic_socialcare2.db")
 
 @function_tool
 def execute_sql(query: str):
