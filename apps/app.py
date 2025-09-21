@@ -1,3 +1,9 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # add project root
+
+from agents import Agent, Runner, trace, function_tool
+
+
 import streamlit as st
 import asyncio
 from agent_config import resultagent, Runner

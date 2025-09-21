@@ -1,4 +1,2 @@
-from .agent_core import Agent
+from .agents import Agent, trace, function_tool
 from .runner import Runner
-from .trace import trace
-from .tools import function_tool
