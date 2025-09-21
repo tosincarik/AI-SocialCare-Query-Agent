@@ -8,6 +8,14 @@ class Agent:
         self.tools = tools or []  # default to empty list
         self.model = model
 
+    def as_tool(self, tool_name, tool_description):
+        # Register this agent as a tool
+        return {
+            "tool_name": tool_name,
+            "tool_description": tool_description,
+            "agent": self
+        }
+
 
     async def run(self, message):
         # Logic for calling the LLM with instructions + tools
