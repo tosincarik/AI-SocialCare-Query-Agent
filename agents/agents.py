@@ -1,11 +1,13 @@
 # agents/agent.py
 
+
 class Agent:
-    def __init__(self, name, instructions, tools, model="gpt-4o-mini"):
+    def __init__(self, name, instructions, tools=None, model="gpt-4o-mini"):
         self.name = name
         self.instructions = instructions
-        self.tools = tools
+        self.tools = tools or []  # default to empty list
         self.model = model
+
 
     async def run(self, message):
         # Logic for calling the LLM with instructions + tools
