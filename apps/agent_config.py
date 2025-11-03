@@ -1,8 +1,13 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # add project root to path
+
+
+
 import os
 import sqlite3
 import streamlit as st
 from dotenv import load_dotenv
-from agents import Agent, Runner, trace, function_tool
+from agent import Agent, Runner, trace, function_tool
 
 # --- Load .env locally if exists ---
 load_dotenv(override=True)
