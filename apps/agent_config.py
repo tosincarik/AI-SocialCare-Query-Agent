@@ -1,25 +1,23 @@
+# apps/agent_config.py
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Add repo root to path
 
-
-
-import os
 import sqlite3
 import streamlit as st
 from dotenv import load_dotenv
-from agent import Agent, Runner, trace, function_tool
+from agents import Agent, Runner, trace, function_tool
 
-# --- Load .env locally if exists ---
+# --- Load .env locally ---
 load_dotenv(override=True)
 
-# --- Set OpenAI API key from Streamlit secrets ---
+# --- Load OpenAI API key from Streamlit secrets ---
 if "OPENAI_API_KEY" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
 st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
 
 # --- Database path ---
-base_dir = os.path.dirname(__file__)
-db_path = os.path.join(base_dir, "synthetic_socialcare2.db")
+db_path = os.path.join(os.path.dirname(__file__), "synthetic_socialcare2.db")
 if not os.path.isfile(db_path):
     st.warning(f"Database not found at {db_path}. Queries may fail.")
 
@@ -52,17 +50,13 @@ Return JSON: {{sql, explanation}}
 Schema: {schema}
 """
 
-# --- Safe Agent1 ---
+# --- Create agent ---
 Agent1 = Agent(name="QueryExecutor", instructions=instruction1, model="gpt-4o-mini")
 tool1_func = getattr(Agent1, "as_tool", None)
-if callable(tool1_func):
-    tool1 = tool1_func(tool_name="instruct", tool_description=instruction1)
-else:
-    tool1 = execute_sql  # fallback
+tool1 = tool1_func(tool_name="instruct", tool_description=instruction1) if callable(tool1_func) else execute_sql
 
 tools = [tool1, execute_sql]
 
-# --- Result agent ---
 resultagent = Agent(
     name="strictinstruct",
     instructions="Execute the SQL query and return a clean formatted table.",
@@ -70,7 +64,6 @@ resultagent = Agent(
     model="gpt-4o-mini"
 )
 
-# --- Debug ---
-st.write("DEBUG: tool1 is", tool1)
+# --- Debug info ---
 st.write("DEBUG: resultagent tools =", tools)
 st.write("DEBUG: DB exists?", os.path.isfile(db_path))
