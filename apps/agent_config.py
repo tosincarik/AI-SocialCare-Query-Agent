@@ -61,8 +61,20 @@ else:
     # fallback if .as_tool() missing
     tool1 = execute_sql
 
+
+
 # --- Final agent ---
 tools = [tool1, execute_sql]
+
+import streamlit as st
+
+st.write("DEBUG: tool1 is", tool1)
+st.write("DEBUG: resultagent tools =", tools)
+st.write("DEBUG: DB exists?", os.path.isfile(db_path))
+st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
+
+
+
 resultagent = Agent(
     name="strictinstruct",
     instructions="Execute the SQL query and return a clean formatted table.",
