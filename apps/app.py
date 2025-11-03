@@ -1,15 +1,15 @@
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # add project root
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from agents import Agent, Runner, trace, function_tool
-
+from agents.runner import Runner
+from agent_config import resultagent
 
 import streamlit as st
 import asyncio
-from agent_config import resultagent, Runner
 
 st.title("💡 Social Care Query Agent")
 
+# --- Chat session state ---
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
@@ -17,6 +17,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# --- Chat input ---
 if prompt := st.chat_input("Ask me about the social care database..."):
     st.session_state["messages"].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -26,16 +27,21 @@ if prompt := st.chat_input("Ask me about the social care database..."):
         placeholder = st.empty()
         placeholder.markdown("⏳ Querying database...")
 
-        async def run_agent():
-            result = await Runner.run(resultagent, prompt)
-            return result.final_output
+        async def run_agent_safe(agent, prompt_text):
+            """Run agent safely and return string output."""
+            try:
+                result = await Runner.run(agent, prompt_text)
+                if result is None:
+                    return "⚠️ Agent returned no output. Check environment or model response."
+                return getattr(result, "final_output", str(result))
+            except Exception as e:
+                return f"⚠️ Error running agent: {e}"
 
+        # Run safely in an event loop
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            output = loop.run_until_complete(run_agent())
-        except Exception as e:
-            output = f"⚠️ Error: {e}"
+            output = loop.run_until_complete(run_agent_safe(resultagent, prompt))
         finally:
             loop.close()
 
