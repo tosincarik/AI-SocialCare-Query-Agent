@@ -1,24 +1,19 @@
 import os
 import sqlite3
-from dotenv import load_dotenv
-
-# Ensure local agents folder is first in path
-import sys
-base_dir = os.path.dirname(__file__)
-sys.path.insert(0, base_dir)
-
-
-import os
-import sqlite3
+import streamlit as st
 from dotenv import load_dotenv
 from agents import Agent, Runner, trace, function_tool
-import streamlit as st
 
-
-# Load environment variables
+# --- Load .env locally if exists ---
 load_dotenv(override=True)
 
+# --- Set OpenAI API key from Streamlit secrets ---
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
+
 # --- Database path ---
+base_dir = os.path.dirname(__file__)
 db_path = os.path.join(base_dir, "synthetic_socialcare2.db")
 if not os.path.isfile(db_path):
     st.warning(f"Database not found at {db_path}. Queries may fail.")
@@ -52,29 +47,17 @@ Return JSON: {{sql, explanation}}
 Schema: {schema}
 """
 
-# --- Safe Agent1 creation ---
+# --- Safe Agent1 ---
 Agent1 = Agent(name="QueryExecutor", instructions=instruction1, model="gpt-4o-mini")
-tool1 = getattr(Agent1, "as_tool", None)
-if callable(tool1):
-    tool1 = Agent1.as_tool(tool_name="instruct", tool_description=instruction1)
+tool1_func = getattr(Agent1, "as_tool", None)
+if callable(tool1_func):
+    tool1 = tool1_func(tool_name="instruct", tool_description=instruction1)
 else:
-    # fallback if .as_tool() missing
-    tool1 = execute_sql
+    tool1 = execute_sql  # fallback
 
-
-
-# --- Final agent ---
 tools = [tool1, execute_sql]
 
-import streamlit as st
-
-st.write("DEBUG: tool1 is", tool1)
-st.write("DEBUG: resultagent tools =", tools)
-st.write("DEBUG: DB exists?", os.path.isfile(db_path))
-st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
-
-
-
+# --- Result agent ---
 resultagent = Agent(
     name="strictinstruct",
     instructions="Execute the SQL query and return a clean formatted table.",
@@ -82,6 +65,7 @@ resultagent = Agent(
     model="gpt-4o-mini"
 )
 
-# --- Debug output on Cloud ---
+# --- Debug ---
 st.write("DEBUG: tool1 is", tool1)
 st.write("DEBUG: resultagent tools =", tools)
+st.write("DEBUG: DB exists?", os.path.isfile(db_path))

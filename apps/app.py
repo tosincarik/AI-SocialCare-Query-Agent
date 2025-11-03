@@ -9,7 +9,7 @@ import asyncio
 
 st.title("💡 Social Care Query Agent")
 
-# --- Chat session state ---
+# --- Initialize chat session ---
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
@@ -32,12 +32,12 @@ if prompt := st.chat_input("Ask me about the social care database..."):
             try:
                 result = await Runner.run(agent, prompt_text)
                 if result is None:
-                    return "⚠️ Agent returned no output. Check environment or model response."
+                    return "⚠️ Agent returned no output. Check API key, model, or DB."
                 return getattr(result, "final_output", str(result))
             except Exception as e:
                 return f"⚠️ Error running agent: {e}"
 
-        # Run safely in an event loop
+        # Run in asyncio loop
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
