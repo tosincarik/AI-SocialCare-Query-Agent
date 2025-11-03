@@ -1,20 +1,8 @@
 import os
-import sqlite3
 import streamlit as st
 
-# Path to your database
-db_path = os.path.join(os.path.dirname(__file__), "synthetic_socialcare2.db")
+# Check if the OpenAI API key is loaded
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-st.write("DB exists?", os.path.isfile(db_path))
-
-if os.path.isfile(db_path):
-    try:
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM clients;")
-            count = cursor.fetchone()[0]
-        st.write("Number of clients in DB:", count)
-    except Exception as e:
-        st.error(f"Error querying DB: {e}")
-else:
-    st.error("Database file not found at expected location.")
+st.write("OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
