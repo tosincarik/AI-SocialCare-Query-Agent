@@ -1,11 +1,19 @@
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Ensure repo root is on path
-
-from agents.runner import Runner
-from agent_config import resultagent
-
 import streamlit as st
 import asyncio
+
+# --- Ensure repo root is on Python path ---
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, repo_root)
+
+# --- Verify paths (optional, remove after testing) ---
+st.write("Python sys.path:", sys.path)
+st.write("Repo root exists?", os.path.isdir(repo_root))
+st.write("Agents folder exists?", os.path.isdir(os.path.join(repo_root, "agents")))
+
+# --- Imports ---
+from agents.runner import Runner
+from agent_config import resultagent
 
 st.title("💡 Social Care Query Agent")
 
@@ -31,10 +39,8 @@ if prompt := st.chat_input("Ask me about the social care database..."):
             """Run agent safely and return string output."""
             try:
                 result = await Runner.run(agent, prompt_text)
-                # If the agent returned None, fallback message
                 if result is None:
                     return "⚠️ Agent returned no output. Check API key, model, or DB."
-                # Use final_output if present, else str(result)
                 return getattr(result, "final_output", str(result))
             except Exception as e:
                 return f"⚠️ Error running agent: {e}"
