@@ -1,30 +1,23 @@
-# apps/agent_config.py
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Add repo root to path
-
 import sqlite3
-import streamlit as st
 from dotenv import load_dotenv
 from agents import Agent, Runner, trace, function_tool
 
-# --- Load .env locally ---
+# --- Load local .env ---
 load_dotenv(override=True)
 
-# --- Load OpenAI API key from Streamlit secrets ---
-if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-
-st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
+# --- Load OpenAI key from environment only (ignore Streamlit secrets locally) ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+print("DEBUG: OPENAI_API_KEY present?", bool(OPENAI_API_KEY))  # visible in console
 
 # --- Database path ---
 db_path = os.path.join(os.path.dirname(__file__), "synthetic_socialcare2.db")
 if not os.path.isfile(db_path):
-    st.warning(f"Database not found at {db_path}. Queries may fail.")
+    print(f"WARNING: Database not found at {db_path}")
 
 # --- SQL execution tool ---
 @function_tool
 def execute_sql(query: str):
-    """Run read-only SQL query on SQLite DB."""
     if not os.path.isfile(db_path):
         return {"error": "Database file not found."}
     with sqlite3.connect(db_path) as conn:
@@ -65,5 +58,5 @@ resultagent = Agent(
 )
 
 # --- Debug info ---
-st.write("DEBUG: resultagent tools =", tools)
-st.write("DEBUG: DB exists?", os.path.isfile(db_path))
+print("DEBUG: resultagent tools =", tools)
+print("DEBUG: DB exists?", os.path.isfile(db_path))
