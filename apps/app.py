@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Ensure repo root is on path
 
 from agents.runner import Runner
 from agent_config import resultagent
@@ -31,8 +31,10 @@ if prompt := st.chat_input("Ask me about the social care database..."):
             """Run agent safely and return string output."""
             try:
                 result = await Runner.run(agent, prompt_text)
+                # If the agent returned None, fallback message
                 if result is None:
                     return "⚠️ Agent returned no output. Check API key, model, or DB."
+                # Use final_output if present, else str(result)
                 return getattr(result, "final_output", str(result))
             except Exception as e:
                 return f"⚠️ Error running agent: {e}"
