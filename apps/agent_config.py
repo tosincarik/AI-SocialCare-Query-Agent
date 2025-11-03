@@ -7,10 +7,13 @@ import sys
 base_dir = os.path.dirname(__file__)
 sys.path.insert(0, base_dir)
 
-from agents.agent import Agent  # explicit import
-from agents.runner import Runner
-from agents import trace, function_tool
+
+import os
+import sqlite3
+from dotenv import load_dotenv
+from agents import Agent, Runner, trace, function_tool
 import streamlit as st
+
 
 # Load environment variables
 load_dotenv(override=True)
