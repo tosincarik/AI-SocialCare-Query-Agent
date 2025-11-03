@@ -1,6 +1,7 @@
 import os
 import openai
 import asyncio
+import json
 
 class Agent:
     def __init__(self, name, instructions, tools=None, model="gpt-4o-mini"):
@@ -10,7 +11,6 @@ class Agent:
         self.model = model
 
     def as_tool(self, tool_name, tool_description):
-        """Register agent as a callable tool"""
         return {
             "tool_name": tool_name,
             "tool_description": tool_description,
@@ -18,11 +18,12 @@ class Agent:
         }
 
     async def run(self, message):
-        """Call OpenAI API asynchronously using the new v1+ API"""
+        """Call OpenAI API, run SQL if possible, and return Markdown table."""
         openai.api_key = os.getenv("OPENAI_API_KEY")
         if not openai.api_key:
             return "⚠️ OpenAI API key not found."
 
+        # --- Step 1: Call LLM to generate SQL ---
         def sync_call():
             try:
                 response = openai.chat.completions.create(
@@ -38,12 +39,42 @@ class Agent:
                 return f"⚠️ OpenAI API error: {e}"
 
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, sync_call)
+        llm_output = await loop.run_in_executor(None, sync_call)
+
+        # --- Step 2: Parse SQL ---
+        sql = None
+        try:
+            parsed = json.loads(llm_output)
+            sql = parsed.get("sql")
+        except Exception:
+            if "SELECT" in llm_output.upper():
+                sql = llm_output.strip()
+
+        # --- Step 3: Execute SQL ---
+        if sql:
+            for tool in self.tools:
+                if callable(tool) and getattr(tool, "is_tool", False):
+                    try:
+                        results = tool(sql)
+                        if isinstance(results, list) and results:
+                            # Convert to Markdown table
+                            headers = results[0].keys()
+                            md = "| " + " | ".join(headers) + " |\n"
+                            md += "| " + " | ".join("---" for _ in headers) + " |\n"
+                            for row in results:
+                                md += "| " + " | ".join(str(row[h]) for h in headers) + " |\n"
+                            return md
+                        else:
+                            return "⚠️ No rows returned."
+                    except Exception as e:
+                        return f"⚠️ Error executing SQL: {e}"
+
+        # --- fallback: just return LLM output ---
+        return llm_output
 
 
 # --- Helpers ---
 def trace(name: str):
-    """Decorator to trace function calls"""
     def wrapper(func):
         def inner(*args, **kwargs):
             print(f"[TRACE] {name}")
@@ -53,6 +84,5 @@ def trace(name: str):
 
 
 def function_tool(func):
-    """Mark a Python function as an agent tool"""
     func.is_tool = True
     return func
