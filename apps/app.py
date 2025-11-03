@@ -4,18 +4,20 @@ import asyncio
 
 # --- Ensure repo root is on Python path ---
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, repo_root)
-
-# --- Verify paths (optional, remove after testing) ---
-st.write("Python sys.path:", sys.path)
-st.write("Repo root exists?", os.path.isdir(repo_root))
-st.write("Agents folder exists?", os.path.isdir(os.path.join(repo_root, "agents")))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 # --- Imports ---
 from agents.runner import Runner
 from agent_config import resultagent
 
 st.title("💡 Social Care Query Agent")
+
+# --- Debug preflight ---
+st.write("DEBUG: Repo root exists?", os.path.isdir(repo_root))
+st.write("DEBUG: Agents folder exists?", os.path.isdir(os.path.join(repo_root, "agents")))
+st.write("DEBUG: DB exists?", os.path.isfile(os.path.join(os.path.dirname(__file__), "synthetic_socialcare2.db")))
+st.write("DEBUG: OPENAI_API_KEY present?", bool(os.getenv("OPENAI_API_KEY")))
 
 # --- Initialize chat session ---
 if "messages" not in st.session_state:
@@ -36,7 +38,6 @@ if prompt := st.chat_input("Ask me about the social care database..."):
         placeholder.markdown("⏳ Querying database...")
 
         async def run_agent_safe(agent, prompt_text):
-            """Run agent safely and return string output."""
             try:
                 result = await Runner.run(agent, prompt_text)
                 if result is None:
